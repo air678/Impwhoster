@@ -10,9 +10,33 @@ cat <<EOF
                  | |                                     
                  |_|                                     
 EOF
+
 # Variable Defined log & whitelist file
 logfile="logins.log"
 whitelist="whitelist.txt"
+
+# downloading animation
+downloading_animation() {
+    echo -n "📥 Installing jq "
+    for i in {1..10}; do
+        echo -n "⬇️"
+        sleep 0.2
+    done
+    echo " ✅"
+}
+
+# Check if jq is installed or not 
+if ! command -v jq &>/dev/null; then
+    echo "⚠️ jq is required for geolocation lookup but is not installed."
+    read -p "Would you like to install it now? (Y/N): " choice
+    if [[ "$choice" == "Y" || "$choice" == "y" ]]; then
+        downloading_animation
+        sudo apt install jq -y
+        echo "✅ jq has been installed successfully!"
+    else
+        echo "❌ jq is not installed. Geolocation functionality will not work."
+    fi
+fi
 
 # geolocation of an IP if 
 # you'll need pro subscription or use other service if there are so many users and ip address
