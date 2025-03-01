@@ -10,14 +10,115 @@ cat <<EOF
                  | |                                     
                  |_|                                     
 EOF
+# Variable Defined log & whitelist file
+logfile="logins.log"
+whitelist="whitelist.txt"
 
-echo "Logged-in Users Information:"
-echo "-----------------------------"
-
-# Get the user login information
-who | awk '{print $1, $5}' | sort | uniq -c | while read count user ip; do
-    if [[ "$ip" == "(:0)" || -z "$ip" ]]; then
-        ip="Local Login"
+# geolocation of an IP if 
+# you'll need pro subscription or use other service if there are so many users and ip address
+get_location() {
+    local ip=$1
+    if [[ "$ip" == "Local Login" ]]; then
+        echo "Local Machine"
+    else
+        location=$(curl -s "http://ip-api.com/json/$ip" | jq -r '.city, .country' | paste -sd ', ')
+        echo "$location"
     fi
-    echo "User: $user | Sessions: $count | IP: $ip"
+}
+
+# To show login users
+show_logged_in_users() {
+    echo "-----------------------------"
+    echo "📋 Logged-in Users Information:"
+    echo "-----------------------------"
+    
+    who | awk '{print $1, $2, $3, $4, $5}' | sort | uniq -c | while read count user tty login_time ip; do
+        if [[ "$ip" == "(:0)" || -z "$ip" ]]; then
+            ip="Local Login"
+        fi
+        
+        location=$(get_location "$ip")
+
+        echo "👤 User: $user | 🖥 Sessions: $count | 🌍 IP: $ip | 📌 TTY: $tty | ⏳ Login Time: $login_time | 📍 Location: $location"
+
+        # Log this login attempt
+        echo "$(date) | User: $user | Sessions: $count | IP: $ip | TTY: $tty | Login Time: $login_time | Location: $location" >> "$logfile"
+    done
+
+    # Shows the  summary
+    total_sessions=$(who | wc -l)
+    unique_users=$(who | awk '{print $1}' | sort | uniq | wc -l)
+
+    echo "-----------------------------"
+    echo "📊 Total Active Sessions: $total_sessions"
+    echo "👥 Unique Logged-in Users: $unique_users"
+    echo "-----------------------------"
+}
+
+# To detect suspicious logins
+detect_suspicious_logins() {
+    echo "-----------------------------"
+    echo "🔍 Checking for Suspicious Logins..."
+    echo "-----------------------------"
+
+    who | awk '{print $1, $5}' | sort | uniq -c | while read count user ip; do
+        if [[ "$ip" == "(:0)" || -z "$ip" ]]; then
+            ip="Local Login"
+        fi
+
+        if [[ "$ip" != "Local Login" && ! $(grep -Fxq "$ip" "$whitelist") ]]; then
+            status="⚠ SUSPICIOUS LOGIN ⚠"
+        else
+            status="✅ Normal"
+        fi
+
+        echo "👤 User: $user | 🖥 Sessions: $count | 🌍 IP: $ip | 🔎 Status: $status"
+    done
+}
+
+# To show login history from log file
+show_login_history() {
+    echo "-----------------------------"
+    echo "📜 Login History (Last 10 Entries)"
+    echo "-----------------------------"
+    tail -10 "$logfile"
+}
+
+# To display system summary
+show_summary() {
+    total_sessions=$(who | wc -l)
+    unique_users=$(who | awk '{print $1}' | sort | uniq | wc -l)
+
+    echo "-----------------------------"
+    echo "📊 System Summary"
+    echo "-----------------------------"
+    echo "📋 Total Active Sessions: $total_sessions"
+    echo "👥 Unique Logged-in Users: $unique_users"
+    echo "📜 Last 5 Login Attempts:"
+    tail -5 "$logfile"
+}
+
+# menu
+while true; do
+    echo ""
+    echo "=================================="
+    echo "🔍 Linux User Monitoring Script 🔍"
+    echo "=================================="
+    echo "1️⃣ Show Logged-in Users"
+    echo "2️⃣ Detect Suspicious Logins"
+    echo "3️⃣ Show Login History"
+    echo "4️⃣ Show System Summary"
+    echo "5️⃣ Exit"
+    echo "=================================="
+    
+    read -p "📌 Enter your choice: " choice
+
+    case $choice in
+        1) show_logged_in_users ;;
+        2) detect_suspicious_logins ;;
+        3) show_login_history ;;
+        4) show_summary ;;
+        5) echo "🚀 Exiting..."; exit ;;
+        *) echo "❌ Invalid option, please try again." ;;
+    esac
 done
